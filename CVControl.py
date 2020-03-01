@@ -53,7 +53,7 @@ def hand_histogram(frame):
     
     
 
-def hist_masking(frame, hist):
+def mask_hist(frame, hist):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, 180, 0, 256], 1)
 
@@ -83,7 +83,7 @@ while cap.isOpened():
         hist = hand_histogram(frame)
     
     if hist_created:
-        pass
+        frame = mask_hist(frame, hist)
     else:
         frame = draw_rect(frame)
    
