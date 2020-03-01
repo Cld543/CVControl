@@ -17,7 +17,7 @@ if not cap.isOpened():
 
 while True:
     ret, frame = cap.read()
-    frame = cv2.resize(frame, (1920, 1080))
+    frame = cv2.resize(frame, (1024, 768))
     frame = cv2.flip(frame, 1)
     #fgmask = bg.apply(frame)
     #cv2.imshow("Input", fgmask)
@@ -37,7 +37,7 @@ while True:
     threshold = cv2.erode(threshold, None, iterations=2)
     threshold = cv2.dilate(threshold, None, iterations=2)
     
-    cv2.imshow('Frame', threshold)
+    cv2.imshow('Frame', frame)
     #cv2.imshow('FG Mask', fgmask)
     
     c = cv2.waitKey(1)
