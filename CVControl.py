@@ -78,7 +78,7 @@ while cap.isOpened():
     frame = cv2.resize(frame, (1024, 768))
     frame = cv2.flip(frame, 1)
         
-    if pressed_key & 0xFF == ord('z'):
+    if pressed_key & 0xFF == ord(' '):
         hist_created = True
         hist = hand_histogram(frame)
     
