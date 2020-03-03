@@ -116,7 +116,7 @@ while camera.isOpened():
                     print (cnt)
                     #app('System Events').keystroke(' ')  # simulate pressing blank space
                     
-
+        cv2.resize(drawing, (1920, 1080))
         cv2.imshow('output', drawing)
 
     # Keyboard OP
