@@ -95,9 +95,6 @@ while cap.isOpened():
             im_y = image_dims[0]
             
             mouse_position = map_mouse_position(c_x, c_y, im_x, im_y) 
-            print("IMAGE: ", image_dims)
-            print( "CURSOR: ", centroid)
-            print("MOUSE: ", mouse_position)
 
             cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
             pag.moveTo(mouse_position[0], mouse_position[1])
@@ -114,3 +111,7 @@ while cap.isOpened():
         bg = cv2.createBackgroundSubtractorMOG2(0, 60)
         print("---Captured Background---")
         bg_captured = True
+    elif k == ord('r'):
+        bg = None
+        bg_captured = False
+        print("---Background Reset---")
