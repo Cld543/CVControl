@@ -1,95 +1,117 @@
 import cv2
 import numpy as np
+import copy
 import pyautogui as pag
 
-hand_hist = None
-traverse_point = []
-total_rectangle = 9
-hand_rect_one_x = None
-hand_rect_one_y = None
 
-hand_rect_two_x = None
-hand_rect_two_y = None
-
+bg_captured = False # Flag to determine if background has been captured.
 cap = cv2.VideoCapture(0)
-bg = cv2.createBackgroundSubtractorMOG2(history = 100, 
-                                        varThreshold = 15, 
-                                        detectShadows = False)
+cap.set(10, 200)
+bg = None # The captured background image to subtract
+bg_region_x = 0.5
+bg_region_y = 0.7
+mouse_position = (screen_height // 2, screen_width // 2)
+screen_width, screen_height = pag.size()
 
-def draw_rect(frame):
-    rows, cols, _ = frame.shape
-    global total_rectangle, hand_rect_one_x, hand_rect_one_y, hand_rect_two_x, hand_rect_two_y
+def subtract_bg(frame):
+    fgmask = bg.apply(frame, learningRate=0)
+    #kernel = np.ones((3, 3), np.uint8)
+    #fgmask = cv2.erode(fgmask, kernel, iterations = 1)
+    image = cv2.bitwise_and(frame, frame, mask=fgmask)
+    return image
 
-    hand_rect_one_x = np.array(
-        [6 * rows / 20, 6 * rows / 20, 6 * rows / 20, 9 * rows / 20, 9 * rows / 20, 9 * rows / 20, 12 * rows / 20,
-         12 * rows / 20, 12 * rows / 20], dtype=np.uint32)
-
-    hand_rect_one_y = np.array(
-        [9 * cols / 20, 10 * cols / 20, 11 * cols / 20, 9 * cols / 20, 10 * cols / 20, 11 * cols / 20, 9 * cols / 20,
-         10 * cols / 20, 11 * cols / 20], dtype=np.uint32)
-
-    hand_rect_two_x = hand_rect_one_x + 25
-    hand_rect_two_y = hand_rect_one_y + 25
-
-    for i in range(total_rectangle):
-        cv2.rectangle(frame, (hand_rect_one_y[i], hand_rect_one_x[i]),
-                      (hand_rect_two_y[i], hand_rect_two_x[i]),
-                      (0, 255, 0), 1)
-    return frame
-
-def hand_histogram(frame):
-    global hand_rect_one_x, hand_rect_one_y
-
-    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    roi = np.zeros([90, 10, 3], dtype=hsv_frame.dtype)
-
-    for i in range(total_rectangle):
-        roi[i * 10: i * 10 + 10, 0: 10] = hsv_frame[hand_rect_one_x[i]:hand_rect_one_x[i] + 10,
-                                          hand_rect_one_y[i]:hand_rect_one_y[i] + 10]
-
-    hand_hist = cv2.calcHist([roi], [0, 1], None, [180, 256], [0, 180, 0, 256])
-    print("Hand histogram created")
-    return cv2.normalize(hand_hist, hand_hist, 0, 255, cv2.NORM_MINMAX)
+def get_center(contour):
+    moments = cv2.moments(contour)
+    if moments['m00'] != 0:
+            cx = int(moments['m10']/moments['m00'])
+            cy = int(moments['m01']/moments['m00'])
+            return cx, cy
+        
+# Maps the x and y coordinates of the inputs to the screen resolution
+def map_mouse_position(x, y, im_x, im_y):
+    height = (x / im_x) * screen_height
+    width = (y / im_y) * screen_width
     
-    
+    return width, height
 
-def mask_hist(frame, hist):
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, 180, 0, 256], 1)
-
-    disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
-    cv2.filter2D(dst, -1, disc, dst)
-
-    ret, thresh = cv2.threshold(dst, 150, 255, cv2.THRESH_BINARY)
-
-    thresh = cv2.merge((thresh, thresh, thresh))
-
-    return cv2.bitwise_and(frame, thresh)
-
-
-if not cap.isOpened():
-    raise IOError("Cannot open webcam")
-
-hist_created = False
 
 while cap.isOpened():
     ret, frame = cap.read()
-    pressed_key = cv2.waitKey(1)
-    frame = cv2.resize(frame, (1024, 768))
+    frame = cv2.bilateralFilter(frame, 5, 50, 100)
     frame = cv2.flip(frame, 1)
+    
+    # Draw rectangle around area that background is going to be captured from
+    cv2.rectangle(frame, (int(bg_region_x * frame.shape[1]), 0),
+                 (frame.shape[1], int(bg_region_y * frame.shape[0])),
+                 (255, 0, 0), 2)
+     
+    cv2.imshow('Initial Frame', frame)
+    
+    if bg_captured:
+        image = subtract_bg(frame)
+        image = image[0:int(bg_region_y * frame.shape[0]),
+                    int(bg_region_x * frame.shape[1]):frame.shape[1]]
         
-    if pressed_key & 0xFF == ord(' '):
-        hist_created = True
-        hist = hand_histogram(frame)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        #cv2.imshow("Gray", gray)
+        blur = cv2.GaussianBlur(gray, (41, 41), 0)
+        #cv2.imshow("Blue", blur)
+        ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY)
+        #cv2.imshow("Mask", thresh)
+        
+        thresh2 = copy.deepcopy(thresh)
+        contours, hier = cv2.findContours(thresh2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contour_length = len(contours)
+        max_area = -1
+        
+        if contour_length > 0:
+            for i in range(contour_length):
+                con = contours[i]
+                con_area = cv2.contourArea(con)
+                if con_area > max_area:
+                    max_area = con_area
+                    max_index = i
+            result = contours[max_index] # Get the max contour
+            hull = cv2.convexHull(result)
+            
+            # Create a blank image to display contours
+            drawing = np.zeros(image.shape, np.uint8)
+           
+# =============================================================================
+#             for c in contours:
+#                 hull = cv2.convexHull(c)
+#                 cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
+#                 cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
+# =============================================================================
+            cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
+            cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
+            cv2.resize(drawing, (1920, 1080))
+            centroid = get_center(result)
+            image_dims = image.shape
+            
+            c_x = centroid[1]
+            c_y = centroid[0]
+            im_x = image_dims[1]
+            im_y = image_dims[0]
+            
+            mouse_position = map_mouse_position(c_x, c_y, im_x, im_y) 
+
+            cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
+            pag.moveTo(mouse_position[0], mouse_position[1])
+            cv2.imshow("Contours", drawing)
+            
+    # Exit if the Escape key is pressed
+    k = cv2.waitKey(10)
     
-    if hist_created:
-        frame = mask_hist(frame, hist)
-    else:
-        frame = draw_rect(frame)
-   
-    cv2.imshow('Frame', frame )
-    
-    if pressed_key == 27:
+    if k == 27: 
+        cap.release()
+        cv2.destroyAllWindows()
         break
-cap.release()
-cv2.destroyAllWindows()
+    elif k == ord(' '):
+        bg = cv2.createBackgroundSubtractorMOG2(0, 60)
+        print("---Captured Background---")
+        bg_captured = True
+    elif k == ord('r'):
+        bg = None
+        bg_captured = False
+        print("---Background Reset---")
