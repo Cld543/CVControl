@@ -10,8 +10,8 @@ cap.set(10, 200)
 bg = None # The captured background image to subtract
 bg_region_x = 0.5
 bg_region_y = 0.7
-mouse_position = (screen_height // 2, screen_width // 2)
 screen_width, screen_height = pag.size()
+mouse_position = (screen_height // 2, screen_width // 2)
 
 def subtract_bg(frame):
     fgmask = bg.apply(frame, learningRate=0)
