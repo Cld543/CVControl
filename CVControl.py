@@ -7,8 +7,9 @@ import math
 bg_captured = False # Flag to determine if background has been captured.
 cap = cv2.VideoCapture(0)
 cap.set(10, 200)
+cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
 bg = None # The captured background image to subtract
-bg_region_x = 0.4
+bg_region_x = 0.5
 bg_region_y = 0.7
 screen_width, screen_height = pag.size()
 mouse_position = (screen_height // 2, screen_width // 2)
@@ -17,8 +18,8 @@ click_ready = False
 
 def subtract_bg(frame):
     fgmask = bg.apply(frame, learningRate=0)
-    #kernel = np.ones((3, 3), np.uint8)
-    #fgmask = cv2.erode(fgmask, kernel, iterations = 1)
+    kernel = np.ones((3, 3), np.uint8)
+    fgmask = cv2.erode(fgmask, kernel, iterations = 1)
     image = cv2.bitwise_and(frame, frame, mask=fgmask)
     return image
 
@@ -83,7 +84,7 @@ while cap.isOpened():
             
             # Create a blank image to display contours
             drawing = np.zeros(image.shape, np.uint8)
-           
+            
 # =============================================================================
 #             for c in contours:
 #                 hull = cv2.convexHull(c)
@@ -117,14 +118,15 @@ while cap.isOpened():
             mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
             dist_left_to_center = dist(left_point, centroid)
                 
-            if dist_left_to_center < 90 and click_ready:
-                    pag.click(mouse_position[0], mouse_position[1])
+            if dist_left_to_center < 70 and click_ready:
+                    #pag.click(mouse_position[0], mouse_position[1])
+                    print("Click!")
                     
             cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
             cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
             cv2.circle(drawing, left_point, 7, (255, 0, 255), -1)
             
-            pag.moveTo(mouse_position[0], mouse_position[1])
+            pag.moveTo(int(mouse_position[0]), int(mouse_position[1]))
             cv2.imshow("Contours", drawing)
             
     # Exit if the Escape key is pressed
@@ -144,5 +146,6 @@ while cap.isOpened():
         click_ready = False
         print("---Background Reset---")
     elif k == ord('c'):
+        print("---Ready to Detect Clicks---")
         click_ready = True
         
