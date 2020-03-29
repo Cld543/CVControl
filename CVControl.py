@@ -2,16 +2,18 @@ import cv2
 import numpy as np
 import copy
 import pyautogui as pag
-
+import math
 
 bg_captured = False # Flag to determine if background has been captured.
 cap = cv2.VideoCapture(0)
 cap.set(10, 200)
 bg = None # The captured background image to subtract
-bg_region_x = 0.5
+bg_region_x = 0.4
 bg_region_y = 0.7
 screen_width, screen_height = pag.size()
 mouse_position = (screen_height // 2, screen_width // 2)
+pag.FAILSAFE = False
+click_ready = False
 
 def subtract_bg(frame):
     fgmask = bg.apply(frame, learningRate=0)
@@ -20,6 +22,7 @@ def subtract_bg(frame):
     image = cv2.bitwise_and(frame, frame, mask=fgmask)
     return image
 
+# Uses the moments of the image to compute the center of the contour
 def get_center(contour):
     moments = cv2.moments(contour)
     if moments['m00'] != 0:
@@ -27,13 +30,17 @@ def get_center(contour):
             cy = int(moments['m01']/moments['m00'])
             return cx, cy
         
-# Maps the x and y coordinates of the inputs to the screen resolution
+# Maps the x and y coordinates of the inputs to the screen resolution. This is
+# used to translate the coordinates of the hand mask image to the user's screen
 def map_mouse_position(x, y, im_x, im_y):
     height = (x / im_x) * screen_height
     width = (y / im_y) * screen_width
     
     return width, height
 
+
+def dist(pt1, pt2):
+    return math.sqrt(((pt1[0] - pt2[0]) ** 2) + (pt1[1] - pt2[1]) ** 2)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -85,18 +92,38 @@ while cap.isOpened():
 # =============================================================================
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
+             
             cv2.resize(drawing, (1920, 1080))
             centroid = get_center(result)
+            
             image_dims = image.shape
+            
+            left_point = tuple(result[result[:,:,0].argmin()][0])
+            right_point = tuple(result[result[:,:,0].argmax()][0])
+            top_point = tuple(result[result[:,:,1].argmin()][0])
+            bottom_point = tuple(result[result[:,:,1].argmax()][0])
+            
+          
+            #print(dist_left_to_center)
             
             c_x = centroid[1]
             c_y = centroid[0]
             im_x = image_dims[1]
             im_y = image_dims[0]
             
-            mouse_position = map_mouse_position(c_x, c_y, im_x, im_y) 
-
+            finger_x = top_point[1]
+            finger_y = top_point[0]
+            
+            mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
+            dist_left_to_center = dist(left_point, centroid)
+                
+            if dist_left_to_center < 90 and click_ready:
+                    pag.click(mouse_position[0], mouse_position[1])
+                    
             cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
+            cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
+            cv2.circle(drawing, left_point, 7, (255, 0, 255), -1)
+            
             pag.moveTo(mouse_position[0], mouse_position[1])
             cv2.imshow("Contours", drawing)
             
@@ -114,4 +141,8 @@ while cap.isOpened():
     elif k == ord('r'):
         bg = None
         bg_captured = False
+        click_ready = False
         print("---Background Reset---")
+    elif k == ord('c'):
+        click_ready = True
+        
