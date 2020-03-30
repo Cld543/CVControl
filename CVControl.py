@@ -57,7 +57,7 @@ while cap.isOpened():
                 cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
     cv2.putText(frame, "From Area Within the Rectangle", (25, 50), 
                 cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
-    cv2.imshow('Initial Frame', frame)
+    cv2.imshow('CVControl', frame)
     
     if bg_captured:
         image = subtract_bg(frame)
@@ -127,8 +127,8 @@ while cap.isOpened():
             cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
             cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
             cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
-            cv2.circle(drawing, bottom_point, 7, (200, 150, 200), -1)
-            
+
+                    
             pag.moveTo(mouse_position[0], mouse_position[1])
             cv2.imshow("Contours", drawing)
             
