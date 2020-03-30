@@ -126,6 +126,8 @@ while cap.isOpened():
             cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
             cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
             cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
+            cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
+            cv2.circle(drawing, bottom_point, 7, (200, 150, 200), -1)
             
             pag.moveTo(mouse_position[0], mouse_position[1])
             cv2.imshow("Contours", drawing)
