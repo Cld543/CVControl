@@ -85,18 +85,15 @@ while cap.isOpened():
             # Create a blank image to display contours
             drawing = np.zeros(image.shape, np.uint8)
             
-# =============================================================================
-#             for c in contours:
-#                 hull = cv2.convexHull(c)
-#                 cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
-#                 cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
-# =============================================================================
+
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
              
             cv2.resize(drawing, (1920, 1080))
             centroid = get_center(result)
-            
+            hull = cv2.convexHull(result, returnPoints=False)
+            defects = cv2.convexityDefects(result, hull)
+
             image_dims = image.shape
             
             left_point = tuple(result[result[:,:,0].argmin()][0])
