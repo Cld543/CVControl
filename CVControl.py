@@ -16,6 +16,8 @@ mouse_position = (screen_height // 2, screen_width // 2)
 pag.FAILSAFE = False
 click_ready = False
 
+# Subtract the background image created using the 
+# cv2::createBackgroundSubtractorMog2 function and return the foreground mask.
 def subtract_bg(frame):
     fgmask = bg.apply(frame, learningRate=0)
     kernel = np.ones((3, 3), np.uint8)
@@ -39,10 +41,11 @@ def map_mouse_position(x, y, im_x, im_y):
     
     return width, height
 
-
+# Compute the euclidean distance between points, represented as tuples.
 def dist(pt1, pt2):
     return math.sqrt(((pt1[0] - pt2[0]) ** 2) + (pt1[1] - pt2[1]) ** 2)
 
+# Main loop
 while cap.isOpened():
     ret, frame = cap.read()
     frame = cv2.bilateralFilter(frame, 5, 50, 100)
