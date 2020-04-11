@@ -3,6 +3,15 @@ import numpy as np
 import copy
 import pyautogui as pag
 import math
+from enum import Enum
+
+class State(Enum):
+    START = 0,
+    MOVING = 1,
+    LEFT_CLICK = 2,
+    RIGHT_CLICK = 3,
+    DRAGGING = 4
+    
 
 bg_captured = False # Flag to determine if background has been captured.
 cap = cv2.VideoCapture(0)
