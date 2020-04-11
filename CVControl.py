@@ -144,7 +144,7 @@ while cap.isOpened():
                 cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
                 cv2.line(drawing, left_point, centroid, (0, 255, 255), 2)
                
-                if delta is not None and delta > 1.8:
+                if dist_left_to_center > click_distance + 15:
                     pag.moveTo(mouse_position[0], mouse_position[1])
             cv2.imshow("Contours", drawing)
             
@@ -167,5 +167,5 @@ while cap.isOpened():
     elif k == ord('c'):
         print("---Ready to Detect Clicks---")
         click_ready = True
-        click_distance = dist(left_point, centroid) / 1.5
+        click_distance = dist(left_point, centroid) / 1.2
         
