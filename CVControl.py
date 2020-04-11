@@ -14,6 +14,7 @@ bg_region_y = 0.7
 screen_width, screen_height = pag.size()
 mouse_position = (screen_height // 2, screen_width // 2)
 pag.FAILSAFE = False
+pag.MINIMUM_SLEEP = 0.001
 click_ready = False
 
 def subtract_bg(frame):
