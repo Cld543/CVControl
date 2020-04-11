@@ -5,6 +5,8 @@ import pyautogui as pag
 import math
 from enum import Enum
 
+# Enum used to determine current program state. Helpful when performing
+# actions while interacting with the mouse through the webcam.
 class State(Enum):
     START = 0,
     MOVING = 1,
@@ -12,22 +14,31 @@ class State(Enum):
     RIGHT_CLICK = 3,
     DRAGGING = 4
     
-
-bg_captured = False # Flag to determine if background has been captured.
+# Assign default system webcam to cap variable.
 cap = cv2.VideoCapture(0)
+# Increase the brightness property of the webcam to help with masking and 
+# background subtraction.
 cap.set(10, 200)
 
-bg = None # The captured background image to subtract
+
+# Flag to determine if background has been captured.
+bg_captured = False 
+bg = None 
+state = State.START
+
+# Percentage of screen regrion to use when capturing the background image.
 bg_region_x = 0.5
 bg_region_y = 0.7
 screen_width, screen_height = pag.size()
 mouse_position = (screen_height // 2, screen_width // 2)
-pag.FAILSAFE = False
-pag.MINIMUM_SLEEP = 0.001
+
 click_ready = False
 click_distance = 0
 current_mouse = None
 prev_mouse = None
+
+pag.FAILSAFE = False
+pag.MINIMUM_SLEEP = 0.001
 
 # Subtract the background image created using the 
 # cv2::createBackgroundSubtractorMog2 function and return the foreground mask.
