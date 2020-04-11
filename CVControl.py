@@ -6,7 +6,7 @@ import math
 
 bg_captured = False # Flag to determine if background has been captured.
 cap = cv2.VideoCapture(0)
-cap.set(10, 100)
+cap.set(10, 200)
 
 bg = None # The captured background image to subtract
 bg_region_x = 0.5
@@ -16,6 +16,9 @@ mouse_position = (screen_height // 2, screen_width // 2)
 pag.FAILSAFE = False
 pag.MINIMUM_SLEEP = 0.001
 click_ready = False
+click_distance = 0
+current_mouse = None
+prev_mouse = None
 
 # Subtract the background image created using the 
 # cv2::createBackgroundSubtractorMog2 function and return the foreground mask.
@@ -44,13 +47,16 @@ def map_mouse_position(x, y, im_x, im_y):
 
 # Compute the euclidean distance between points, represented as tuples.
 def dist(pt1, pt2):
-    return math.sqrt(((pt1[0] - pt2[0]) ** 2) + (pt1[1] - pt2[1]) ** 2)
+    if pt1 is not None and pt2 is not None:
+        return math.sqrt(((pt1[0] - pt2[0]) ** 2) + (pt1[1] - pt2[1]) ** 2)
 
 # Main loop
 while cap.isOpened():
     ret, frame = cap.read()
     frame = cv2.bilateralFilter(frame, 5, 50, 100)
     frame = cv2.flip(frame, 1)
+    
+ 
     
     # Draw rectangle around area that background is going to be captured from
     cv2.rectangle(frame, (int(bg_region_x * frame.shape[1]), 0),
@@ -68,6 +74,8 @@ while cap.isOpened():
         image = image[0:int(bg_region_y * frame.shape[0]),
                     int(bg_region_x * frame.shape[1]):frame.shape[1]]
         
+        # Apply a variety of masks to the image to make it easier to detect 
+        # the contours within it.
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         #cv2.imshow("Gray", gray)
         blur = cv2.GaussianBlur(gray, (41, 41), 0)
@@ -75,8 +83,8 @@ while cap.isOpened():
         ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY)
         #cv2.imshow("Mask", thresh)
         
-        thresh2 = copy.deepcopy(thresh)
-        contours, hier = cv2.findContours(thresh2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        #thresh2 = copy.deepcopy(thresh)
+        contours, hier = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contour_length = len(contours)
         max_area = -1
         
@@ -98,7 +106,6 @@ while cap.isOpened():
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
              
             cv2.resize(drawing, (screen_height, screen_width))
-            centroid = get_center(result)
             hull = cv2.convexHull(result, returnPoints=False)
             defects = cv2.convexityDefects(result, hull)
 
@@ -109,31 +116,36 @@ while cap.isOpened():
             top_point = tuple(result[result[:,:,1].argmin()][0])
             bottom_point = tuple(result[result[:,:,1].argmax()][0])
             
-          
-            #print(dist_left_to_center)
-            
-            c_x = centroid[1]
-            c_y = centroid[0]
-            im_x = image_dims[1]
-            im_y = image_dims[0]
-            
-            finger_x = top_point[1]
-            finger_y = top_point[0]
-            
-            mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
-            dist_left_to_center = dist(left_point, centroid)
+            centroid = get_center(result)
+            if centroid is not None:
+                c_x = centroid[1]
+                c_y = centroid[0]
+                im_x = image_dims[1]
+                im_y = image_dims[0]
                 
-            if dist_left_to_center < 70 and click_ready:
-                    #pag.click(mouse_position[0], mouse_position[1])
-                    print("Click!")
+                finger_x = top_point[1]
+                finger_y = top_point[0]
+                
+                prev_mouse = current_mouse
+                current_mouse = top_point
+                delta = dist(prev_mouse, current_mouse)
+                
+               
+                mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
+                dist_left_to_center = dist(left_point, centroid)
                     
-            cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
-            cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
-            cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
-            cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
-
-                    
-            pag.moveTo(mouse_position[0], mouse_position[1])
+                if dist_left_to_center < click_distance and click_ready:
+                        #pag.click(mouse_position[0], mouse_position[1])
+                        print("Click!")
+                        
+                cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
+                cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
+                cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
+                cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
+                cv2.line(drawing, left_point, centroid, (0, 255, 255), 2)
+               
+                if delta is not None and delta > 1.8:
+                    pag.moveTo(mouse_position[0], mouse_position[1])
             cv2.imshow("Contours", drawing)
             
     # Exit if the Escape key is pressed
@@ -155,4 +167,5 @@ while cap.isOpened():
     elif k == ord('c'):
         print("---Ready to Detect Clicks---")
         click_ready = True
+        click_distance = dist(left_point, centroid) / 1.5
         
