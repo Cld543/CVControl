@@ -6,8 +6,8 @@ import math
 
 bg_captured = False # Flag to determine if background has been captured.
 cap = cv2.VideoCapture(0)
-cap.set(10, 200)
-cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+cap.set(10, 100)
+
 bg = None # The captured background image to subtract
 bg_region_x = 0.5
 bg_region_y = 0.7
@@ -17,6 +17,8 @@ pag.FAILSAFE = False
 pag.MINIMUM_SLEEP = 0.001
 click_ready = False
 
+# Subtract the background image created using the 
+# cv2::createBackgroundSubtractorMog2 function and return the foreground mask.
 def subtract_bg(frame):
     fgmask = bg.apply(frame, learningRate=0)
     kernel = np.ones((3, 3), np.uint8)
@@ -40,10 +42,11 @@ def map_mouse_position(x, y, im_x, im_y):
     
     return width, height
 
-
+# Compute the euclidean distance between points, represented as tuples.
 def dist(pt1, pt2):
     return math.sqrt(((pt1[0] - pt2[0]) ** 2) + (pt1[1] - pt2[1]) ** 2)
 
+# Main loop
 while cap.isOpened():
     ret, frame = cap.read()
     frame = cv2.bilateralFilter(frame, 5, 50, 100)
@@ -53,8 +56,12 @@ while cap.isOpened():
     cv2.rectangle(frame, (int(bg_region_x * frame.shape[1]), 0),
                  (frame.shape[1], int(bg_region_y * frame.shape[0])),
                  (255, 0, 0), 2)
-     
-    cv2.imshow('Initial Frame', frame)
+    
+    cv2.putText(frame, "Press Space to Capture Background", (25, 25), 
+                cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+    cv2.putText(frame, "From Area Within the Rectangle", (25, 50), 
+                cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+    cv2.imshow('CVControl', frame)
     
     if bg_captured:
         image = subtract_bg(frame)
@@ -90,7 +97,7 @@ while cap.isOpened():
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
              
-            cv2.resize(drawing, (1920, 1080))
+            cv2.resize(drawing, (screen_height, screen_width))
             centroid = get_center(result)
             hull = cv2.convexHull(result, returnPoints=False)
             defects = cv2.convexityDefects(result, hull)
@@ -122,9 +129,11 @@ while cap.isOpened():
                     
             cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
             cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
-            cv2.circle(drawing, left_point, 7, (255, 0, 255), -1)
-            
-            pag.moveTo(int(mouse_position[0]), int(mouse_position[1]))
+            cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
+            cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
+
+                    
+            pag.moveTo(mouse_position[0], mouse_position[1])
             cv2.imshow("Contours", drawing)
             
     # Exit if the Escape key is pressed
