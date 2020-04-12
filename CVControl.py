@@ -70,13 +70,45 @@ def dist(pt1, pt2):
     if pt1 is not None and pt2 is not None:
         return math.sqrt(((pt1[0] - pt2[0]) ** 2) + (pt1[1] - pt2[1]) ** 2)
 
+# Uses the convexity defects of the contours parameter (the points within a 
+# convex hull that are farthest away from the hull that form a 'cavity' 
+# within the hull) in order to count the number of fingers that are currently
+# being held up in the image. Returns the number of fingers and draws a circle
+# on each of the convexity defect points to indicate this.
+def get_fingers(image, contours):
+     hull = cv2.convexHull(contours, returnPoints = False)
+
+     if len(hull) > 3:
+        defects = cv2.convexityDefects(contours, hull)
+        if defects is not None:
+            count = 0
+            
+            for i in range(defects.shape[0]):
+                # Gets the key points of the defects
+                d_start, d_end, d_far, d_depth = defects[i, 1]
+                start_point = tuple(contours[d_start][0])
+                end_point = tuple(contours[d_end][0])
+                far_point = tuple(contours[d_far][0])
+                
+                # Create triangle with points to calculate angle and
+                # only draw points with snaller angles, so number of counts
+                # will represent number of fingers.
+                a = dist(start_point, end_point)
+                b = dist(far_point, start_point)
+                c = dist(end_point, far_point)
+                angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))
+                
+                # If angle less than 100 degrees (in radians)
+                if angle <= 1.74533:  
+                    count += 1
+                    cv2.circle(image, far_point, 7, (200, 200, 50), -1)
+            return count
+        
 # Main loop
 while cap.isOpened():
     ret, frame = cap.read()
     frame = cv2.bilateralFilter(frame, 5, 50, 100)
     frame = cv2.flip(frame, 1)
-    
- 
     
     # Draw rectangle around area that background is going to be captured from
     cv2.rectangle(frame, (int(bg_region_x * frame.shape[1]), 0),
@@ -103,8 +135,8 @@ while cap.isOpened():
         ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY)
         #cv2.imshow("Mask", thresh)
         
-        #thresh2 = copy.deepcopy(thresh)
-        contours, hier = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        thresh2 = copy.deepcopy(thresh)
+        contours, hier = cv2.findContours(thresh2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contour_length = len(contours)
         max_area = -1
         
@@ -112,9 +144,11 @@ while cap.isOpened():
             for i in range(contour_length):
                 con = contours[i]
                 con_area = cv2.contourArea(con)
+                
                 if con_area > max_area:
                     max_area = con_area
                     max_index = i
+                    
             result = contours[max_index] # Get the max contour
             hull = cv2.convexHull(result)
             
@@ -124,10 +158,19 @@ while cap.isOpened():
 
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
-             
-            cv2.resize(drawing, (screen_height, screen_width))
-            hull = cv2.convexHull(result, returnPoints=False)
-            defects = cv2.convexityDefects(result, hull)
+            
+            num_fingers = get_fingers(drawing, result)
+            if num_fingers is not None:
+                num_fingers += 1
+            else:
+                num_fingers = 0
+                
+            cv2.putText(drawing, str(num_fingers) , (25,
+                       drawing.shape[0] - 25),
+                       cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+            
+           
+                    
 
             image_dims = image.shape
             
@@ -162,12 +205,17 @@ while cap.isOpened():
                 cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
                 cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
                 cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
-                cv2.line(drawing, left_point, centroid, (0, 255, 255), 2)
-               
+                
+                #cv2.line(drawing, left_point, centroid, (0, 255, 255), 2)
+                #cv2.line(drawing, top_point, centroid, (0, 255, 255), 2)
+                
+                
                 if dist_left_to_center > click_distance + 15:
                     pag.moveTo(mouse_position[0], mouse_position[1])
+                    
+            cv2.resize(drawing, (screen_height, screen_width))
             cv2.imshow("Contours", drawing)
-            
+                
     # Exit if the Escape key is pressed
     k = cv2.waitKey(10)
     
