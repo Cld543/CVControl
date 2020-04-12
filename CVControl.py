@@ -36,7 +36,8 @@ click_ready = False
 click_distance = 0
 current_mouse = None
 prev_mouse = None
-
+current_fingers = 0
+prev_fingers = 0
 pag.FAILSAFE = False
 pag.MINIMUM_SLEEP = 0.001
 
@@ -85,7 +86,7 @@ def get_fingers(image, contours):
             
             for i in range(defects.shape[0]):
                 # Gets the key points of the defects
-                d_start, d_end, d_far, d_depth = defects[i, 1]
+                d_start, d_end, d_far, d_depth = defects[i, 0]
                 start_point = tuple(contours[d_start][0])
                 end_point = tuple(contours[d_end][0])
                 far_point = tuple(contours[d_far][0])
@@ -164,7 +165,10 @@ while cap.isOpened():
                 num_fingers += 1
             else:
                 num_fingers = 0
-                
+            
+            prev_fingers = current_fingers
+            current_fingers = num_fingers
+            print((prev_fingers, current_fingers))
             cv2.putText(drawing, str(num_fingers) , (25,
                        drawing.shape[0] - 25),
                        cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
