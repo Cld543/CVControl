@@ -38,6 +38,8 @@ current_mouse = None
 prev_mouse = None
 current_fingers = 0
 prev_fingers = 0
+current_state = -1
+prev_state = -1
 pag.FAILSAFE = False
 pag.MINIMUM_SLEEP = 0.001
 
@@ -134,7 +136,7 @@ while cap.isOpened():
         #cv2.imshow("Gray", gray)
         blur = cv2.GaussianBlur(gray, (41, 41), 0)
         #cv2.imshow("Blue", blur)
-        ret, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
         #cv2.imshow("Mask", thresh)
         
         thresh2 = copy.deepcopy(thresh)
@@ -161,18 +163,20 @@ while cap.isOpened():
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
             
-            num_fingers = get_fingers(drawing, result)
-            if num_fingers is not None:
-                num_fingers += 1
-            else:
-                num_fingers = 0
-            
-            prev_fingers = current_fingers
-            current_fingers = num_fingers
-            #print((prev_fingers, current_fingers))
-            cv2.putText(drawing, str(num_fingers) , (25,
-                       drawing.shape[0] - 25),
-                       cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+# =============================================================================
+#             num_fingers = get_fingers(drawing, result)
+#             if num_fingers is not None:
+#                 num_fingers += 1
+#             else:
+#                 num_fingers = 0
+#             
+#             prev_fingers = current_fingers
+#             current_fingers = num_fingers
+#             #print((prev_fingers, current_fingers))
+#             cv2.putText(drawing, str(num_fingers) , (25,
+#                        drawing.shape[0] - 25),
+#                        cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
+# =============================================================================
                             
 
             image_dims = image.shape
@@ -195,25 +199,56 @@ while cap.isOpened():
                 prev_mouse = current_mouse
                 current_mouse = top_point
                 delta = dist(prev_mouse, current_mouse)
+               
+                num_fingers = get_fingers(drawing, result)
+                if num_fingers is not None:
+                    num_fingers += 1
+                else:
+                    num_fingers = 0
+            
+                dist_top_to_center = dist(top_point, centroid) 
+                if dist_top_to_center < 100 and num_fingers == 1:
+                    num_fingers = 0
+                prev_fingers = current_fingers
+                current_fingers = num_fingers
                 
+                #print((prev_fingers, current_fingers))
+                cv2.putText(drawing, str(num_fingers) , (25,
+                           drawing.shape[0] - 25),
+                           cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
                
                 mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
-                dist_left_to_center = dist(left_point, centroid)
+                
+                
+                prev_state = state
+                
                 
                 if state == State.MOVING:
+                    current_state = State.MOVING
                     pag.moveTo(mouse_position[0], mouse_position[1])
                     
                 if prev_fingers == 2 and current_fingers == 1:
+                    current_state = State.LEFT_CLICK
                     state = State.LEFT_CLICK
-                #print(state)
                 
-                
+                if prev_fingers == 3 and current_fingers == 2:
+                    current_state = State.RIGHT_CLICK
+                    state = State.RIGHT_CLICK
                     
                 if click_ready and state == State.LEFT_CLICK:
-                        pag.click(mouse_position[0], mouse_position[1])
-                        print("Click!")
-                        state = State.MOVING
-                        
+                    pag.click(mouse_position[0], mouse_position[1])
+                    print("Click!")
+                    current_state = State.MOVING
+                    state = State.MOVING
+                    
+                if click_ready and state == State.RIGHT_CLICK:
+                    pag.rightClick(mouse_position[0], mouse_position[1])
+                    print("Right Click!")
+                    current_state = State.MOVING
+                    state = State.MOVING
+                    
+                
+                #print("Current: ", state, "  Prev: ", prev_state)
                 cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
                 cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
                 cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
@@ -250,4 +285,6 @@ while cap.isOpened():
         click_ready = True
         click_distance = dist(left_point, centroid) / 1.2
         state = State.MOVING
-        
+    elif k == ord('s'):
+        click_ready = False
+        state = State.MOVING
