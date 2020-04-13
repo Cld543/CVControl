@@ -123,6 +123,7 @@ while cap.isOpened():
     cv2.imshow('CVControl', frame)
     
     if bg_captured:
+        stat = State.MOVING
         image = subtract_bg(frame)
         image = image[0:int(bg_region_y * frame.shape[0]),
                     int(bg_region_x * frame.shape[1]):frame.shape[1]]
@@ -168,13 +169,11 @@ while cap.isOpened():
             
             prev_fingers = current_fingers
             current_fingers = num_fingers
-            print((prev_fingers, current_fingers))
+            #print((prev_fingers, current_fingers))
             cv2.putText(drawing, str(num_fingers) , (25,
                        drawing.shape[0] - 25),
                        cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
-            
-           
-                    
+                            
 
             image_dims = image.shape
             
@@ -200,10 +199,20 @@ while cap.isOpened():
                
                 mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
                 dist_left_to_center = dist(left_point, centroid)
+                
+                if state == State.MOVING:
+                    pag.moveTo(mouse_position[0], mouse_position[1])
                     
-                if dist_left_to_center < click_distance and click_ready:
-                        #pag.click(mouse_position[0], mouse_position[1])
+                if prev_fingers == 2 and current_fingers == 1:
+                    state = State.LEFT_CLICK
+                #print(state)
+                
+                
+                    
+                if click_ready and state == State.LEFT_CLICK:
+                        pag.click(mouse_position[0], mouse_position[1])
                         print("Click!")
+                        state = State.MOVING
                         
                 cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
                 cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
@@ -214,8 +223,7 @@ while cap.isOpened():
                 #cv2.line(drawing, top_point, centroid, (0, 255, 255), 2)
                 
                 
-                if dist_left_to_center > click_distance + 15:
-                    pag.moveTo(mouse_position[0], mouse_position[1])
+           
                     
             cv2.resize(drawing, (screen_height, screen_width))
             cv2.imshow("Contours", drawing)
@@ -235,9 +243,11 @@ while cap.isOpened():
         bg = None
         bg_captured = False
         click_ready = False
+        state = State.START
         print("---Background Reset---")
     elif k == ord('c'):
         print("---Ready to Detect Clicks---")
         click_ready = True
         click_distance = dist(left_point, centroid) / 1.2
+        state = State.MOVING
         
