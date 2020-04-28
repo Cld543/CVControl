@@ -12,7 +12,8 @@ class State(Enum):
     MOVING = 1,
     LEFT_CLICK = 2,
     RIGHT_CLICK = 3,
-    DRAGGING = 4
+    MOUSE_DOWN = 4,
+    MOUSE_UP = 5
     
 # Assign default system webcam to cap variable.
 cap = cv2.VideoCapture(0)
@@ -26,7 +27,7 @@ bg_captured = False
 bg = None 
 state = State.START
 
-# Percentage of screen regrion to use when capturing the background image.
+# Percentage of screen region to use when capturing the background image.
 bg_region_x = 0.5
 bg_region_y = 0.7
 screen_width, screen_height = pag.size()
@@ -38,7 +39,6 @@ current_mouse = None
 prev_mouse = None
 current_fingers = 0
 prev_fingers = 0
-current_state = -1
 prev_state = -1
 pag.FAILSAFE = False
 pag.MINIMUM_SLEEP = 0.001
@@ -162,31 +162,18 @@ while cap.isOpened():
 
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
-            
-# =============================================================================
-#             num_fingers = get_fingers(drawing, result)
-#             if num_fingers is not None:
-#                 num_fingers += 1
-#             else:
-#                 num_fingers = 0
-#             
-#             prev_fingers = current_fingers
-#             current_fingers = num_fingers
-#             #print((prev_fingers, current_fingers))
-#             cv2.putText(drawing, str(num_fingers) , (25,
-#                        drawing.shape[0] - 25),
-#                        cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
-# =============================================================================
-                            
+                                       
 
             image_dims = image.shape
             
+            # Extract the key points from the contour
             left_point = tuple(result[result[:,:,0].argmin()][0])
             right_point = tuple(result[result[:,:,0].argmax()][0])
             top_point = tuple(result[result[:,:,1].argmin()][0])
             bottom_point = tuple(result[result[:,:,1].argmax()][0])
             
             centroid = get_center(result)
+            
             if centroid is not None:
                 c_x = centroid[1]
                 c_y = centroid[0]
@@ -224,28 +211,38 @@ while cap.isOpened():
                 
                 
                 if state == State.MOVING:
-                    current_state = State.MOVING
                     pag.moveTo(mouse_position[0], mouse_position[1])
                     
                 if prev_fingers == 2 and current_fingers == 1:
-                    current_state = State.LEFT_CLICK
                     state = State.LEFT_CLICK
                 
                 if prev_fingers == 3 and current_fingers == 2:
-                    current_state = State.RIGHT_CLICK
                     state = State.RIGHT_CLICK
                     
-                if click_ready and state == State.LEFT_CLICK:
-                    pag.click(mouse_position[0], mouse_position[1])
-                    print("Click!")
-                    current_state = State.MOVING
-                    state = State.MOVING
+                if prev_fingers == 5 and current_fingers == 4:
+                    state = State.MOUSE_DOWN
+                
+                if prev_fingers == 4 and current_fingers != 4:
+                    state = State.MOUSE_UP
                     
-                if click_ready and state == State.RIGHT_CLICK:
-                    pag.rightClick(mouse_position[0], mouse_position[1])
-                    print("Right Click!")
-                    current_state = State.MOVING
-                    state = State.MOVING
+                if click_ready:
+                    if state == State.LEFT_CLICK:
+                        pag.click(mouse_position[0], mouse_position[1])
+                        print("Click!")
+                        state = State.MOVING
+                        
+                    if state == State.RIGHT_CLICK:
+                        pag.rightClick(mouse_position[0], mouse_position[1])
+                        print("Right Click!")
+                        state = State.MOVING
+                    
+                    if state == State.MOUSE_DOWN:
+                        pag.mouseDown()
+                    
+                    if state == State.MOUSE_UP:
+                      pag.mouseUp()  
+                    
+                
                     
                 
                 #print("Current: ", state, "  Prev: ", prev_state)
