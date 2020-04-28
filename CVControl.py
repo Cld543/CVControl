@@ -13,7 +13,8 @@ class State(Enum):
     LEFT_CLICK = 2,
     RIGHT_CLICK = 3,
     MOUSE_DOWN = 4,
-    MOUSE_UP = 5
+    MOUSE_UP = 5,
+    SCROLL = 6
     
 # Assign default system webcam to cap variable.
 cap = cv2.VideoCapture(0)
@@ -183,9 +184,11 @@ while cap.isOpened():
                 finger_x = top_point[1]
                 finger_y = top_point[0]
                 
+                top_center_mid = dist(top_point, centroid) / 2
+                
                 prev_mouse = current_mouse
                 current_mouse = top_point
-                delta = dist(prev_mouse, current_mouse)
+                
                
                 num_fingers = get_fingers(drawing, result)
                 if num_fingers is not None:
@@ -194,7 +197,8 @@ while cap.isOpened():
                     num_fingers = 0
             
                 dist_top_to_center = dist(top_point, centroid) 
-                if dist_top_to_center < 100 and num_fingers == 1:
+                dist_left_to_center = dist(left_point, centroid)
+                if dist_top_to_center < 120 and num_fingers == 1:
                     num_fingers = 0
                 prev_fingers = current_fingers
                 current_fingers = num_fingers
@@ -206,12 +210,15 @@ while cap.isOpened():
                
                 mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
                 
-                
+                #print(f"Y-POSITION: {mouse_position[1]}")
                 prev_state = state
                 
                 
                 if state == State.MOVING:
                     pag.moveTo(mouse_position[0], mouse_position[1])
+                    
+                if prev_fingers == 0 and current_fingers == 0:
+                    state = State.SCROLL                                
                     
                 if prev_fingers == 2 and current_fingers == 1:
                     state = State.LEFT_CLICK
@@ -224,6 +231,7 @@ while cap.isOpened():
                 
                 if prev_fingers == 4 and current_fingers != 4:
                     state = State.MOUSE_UP
+                
                     
                 if click_ready:
                     if state == State.LEFT_CLICK:
@@ -238,10 +246,23 @@ while cap.isOpened():
                     
                     if state == State.MOUSE_DOWN:
                         pag.mouseDown()
+                        pag.moveTo(mouse_position[0], mouse_position[1])
                     
                     if state == State.MOUSE_UP:
-                      pag.mouseUp()  
+                        pag.mouseUp()  
+                        state = State.MOVING
                     
+                    if state == State.SCROLL:
+                        if mouse_position[1] < screen_height / 2 - 10:
+                            pag.scroll(15)
+                            print("Scrolling up")                           
+                        elif mouse_position[1] > screen_height / 2 + 10:
+                            pag.scroll(-15)
+                            print("Scrolling down")
+                            
+                        if prev_fingers == 0 and current_fingers != 0:
+                            state = State.MOVING
+                            
                 
                     
                 
@@ -284,4 +305,4 @@ while cap.isOpened():
         state = State.MOVING
     elif k == ord('s'):
         click_ready = False
-        state = State.MOVING
+        
