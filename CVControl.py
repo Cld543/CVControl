@@ -1,8 +1,19 @@
+# CVControl - Computer Vision Based Mouse Control
+# 
+# @Author: Chris Dellinger
+# @Version: 5/4/2020
+#
+# This application aims to provide an alternative method for controlling a 
+# computer's mouse input by using computer vision and image processing
+# techniques.
+#
+#  
+#
 import cv2
 import numpy as np
-import copy
 import pyautogui as pag
 import math
+import copy
 from enum import Enum
 
 # Enum used to determine current program state. Helpful when performing
@@ -35,14 +46,11 @@ screen_width, screen_height = pag.size()
 mouse_position = (screen_height // 2, screen_width // 2)
 
 click_ready = False
-click_distance = 0
-current_mouse = None
-prev_mouse = None
 current_fingers = 0
 prev_fingers = 0
 prev_state = -1
 pag.FAILSAFE = False
-pag.MINIMUM_SLEEP = 0.001
+pag.MINIMUM_SLEEP = 0.01
 
 # Subtract the background image created using the 
 # cv2::createBackgroundSubtractorMog2 function and return the foreground mask.
@@ -102,7 +110,8 @@ def get_fingers(image, contours):
                 c = dist(end_point, far_point)
                 angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))
                 
-                # If angle less than 100 degrees (in radians)
+                # If angle less than 100 degrees (in radians), add one to finger
+                # count and draw a circle at the convexity defect location
                 if angle <= 1.74533:  
                     count += 1
                     cv2.circle(image, far_point, 7, (200, 200, 50), -1)
@@ -119,24 +128,33 @@ while cap.isOpened():
                  (frame.shape[1], int(bg_region_y * frame.shape[0])),
                  (255, 0, 0), 2)
     
-    cv2.putText(frame, "Press Space to Capture Background", (25, 25), 
-                cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
-    cv2.putText(frame, "From Area Within the Rectangle", (25, 50), 
-                cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+    if not bg_captured:
+        cv2.putText(frame, "Press Space to Capture Background", (25, 25), 
+                    cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+        cv2.putText(frame, "From Area Within the Rectangle", (25, 50), 
+                    cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+    else:
+        cv2.putText(frame, "Press 'R' to re-capture background", (25, 25), 
+                    cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+        if not click_ready:
+            cv2.putText(frame, "Press 'C' to start mouse control", (25, 50), 
+                        cv2.FONT_HERSHEY_PLAIN, 1.5, (255,255,255), 1)
+        
     cv2.imshow('CVControl', frame)
     
     if bg_captured:
-        stat = State.MOVING
         image = subtract_bg(frame)
+        
+        # Grab the screen area represented by the blue box.
         image = image[0:int(bg_region_y * frame.shape[0]),
                     int(bg_region_x * frame.shape[1]):frame.shape[1]]
-        
+        image_dims = image.shape
         # Apply a variety of masks to the image to make it easier to detect 
         # the contours within it.
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         #cv2.imshow("Gray", gray)
         blur = cv2.GaussianBlur(gray, (41, 41), 0)
-        #cv2.imshow("Blue", blur)
+        #cv2.imshow("Blur", blur)
         ret, thresh = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
         #cv2.imshow("Mask", thresh)
         
@@ -153,19 +171,18 @@ while cap.isOpened():
                 if con_area > max_area:
                     max_area = con_area
                     max_index = i
-                    
-            result = contours[max_index] # Get the max contour
+            
+            # Get the contour with the maximum area
+            result = contours[max_index] 
             hull = cv2.convexHull(result)
             
             # Create a blank image to display contours
             drawing = np.zeros(image.shape, np.uint8)
             
-
             cv2.drawContours(drawing, [result], 0, (0, 255, 0), 2)
             cv2.drawContours(drawing, [hull], 0, (0, 0, 255), 3)
                                        
-
-            image_dims = image.shape
+            
             
             # Extract the key points from the contour
             left_point = tuple(result[result[:,:,0].argmin()][0])
@@ -181,39 +198,36 @@ while cap.isOpened():
                 im_x = image_dims[1]
                 im_y = image_dims[0]
                 
+                # Use the top-most point to control the mouse location
                 finger_x = top_point[1]
                 finger_y = top_point[0]
-                
-                top_center_mid = dist(top_point, centroid) / 2
-                
-                prev_mouse = current_mouse
-                current_mouse = top_point
-                
-               
+                        
                 num_fingers = get_fingers(drawing, result)
+                
                 if num_fingers is not None:
                     num_fingers += 1
                 else:
                     num_fingers = 0
             
                 dist_top_to_center = dist(top_point, centroid) 
-                dist_left_to_center = dist(left_point, centroid)
+
                 if dist_top_to_center < 120 and num_fingers == 1:
                     num_fingers = 0
                 prev_fingers = current_fingers
                 current_fingers = num_fingers
                 
-                #print((prev_fingers, current_fingers))
+                # Display number of fingers currently being held up.
                 cv2.putText(drawing, str(num_fingers) , (25,
                            drawing.shape[0] - 25),
                            cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
                
+                # Map contour coordinates to screen coordinates
                 mouse_position = map_mouse_position(finger_x, finger_y, im_x, im_y) 
-                
-                #print(f"Y-POSITION: {mouse_position[1]}")
+
+                # Set the program state according to the change in the number
+                # of fingers held up since the previous frame
                 prev_state = state
-                
-                
+                             
                 if state == State.MOVING:
                     pag.moveTo(mouse_position[0], mouse_position[1])
                     
@@ -232,7 +246,7 @@ while cap.isOpened():
                 if prev_fingers == 4 and current_fingers != 4:
                     state = State.MOUSE_UP
                 
-                    
+                # Perform actions based on the current state of the program
                 if click_ready:
                     if state == State.LEFT_CLICK:
                         pag.click(mouse_position[0], mouse_position[1])
@@ -253,10 +267,10 @@ while cap.isOpened():
                         state = State.MOVING
                     
                     if state == State.SCROLL:
-                        if mouse_position[1] < screen_height / 2 - 10:
+                        if mouse_position[1] < screen_height / 2 + 100:
                             pag.scroll(15)
                             print("Scrolling up")                           
-                        elif mouse_position[1] > screen_height / 2 + 10:
+                        elif mouse_position[1] > screen_height / 2 + 300:
                             pag.scroll(-15)
                             print("Scrolling down")
                             
@@ -264,21 +278,14 @@ while cap.isOpened():
                             state = State.MOVING
                             
                 
-                    
-                
-                #print("Current: ", state, "  Prev: ", prev_state)
+                # Draw circles over all key points of hull
                 cv2.circle(drawing, centroid, 7, (255, 0, 0), -1)
                 cv2.circle(drawing, top_point, 7, (255, 0, 255), -1)
                 cv2.circle(drawing, left_point, 7, (255, 150, 0), -1)
                 cv2.circle(drawing, right_point, 7, (20, 150, 255), -1)
-                
-                #cv2.line(drawing, left_point, centroid, (0, 255, 255), 2)
-                #cv2.line(drawing, top_point, centroid, (0, 255, 255), 2)
-                
-                
-           
-                    
+
             cv2.resize(drawing, (screen_height, screen_width))
+            # Display the contour image.
             cv2.imshow("Contours", drawing)
                 
     # Exit if the Escape key is pressed
@@ -299,10 +306,12 @@ while cap.isOpened():
         state = State.START
         print("---Background Reset---")
     elif k == ord('c'):
-        print("---Ready to Detect Clicks---")
-        click_ready = True
-        click_distance = dist(left_point, centroid) / 1.2
-        state = State.MOVING
-    elif k == ord('s'):
-        click_ready = False
+        if not click_ready:
+            print("---Ready to Detect Clicks---")
+            click_ready = True
+            state = State.MOVING
+        else:
+            print("---Click Detection Disabled---")
+            click_ready = False
+            state = State.START
         
